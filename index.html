@@ -111,7 +111,7 @@ button:hover {
     <tbody id="marksBody"></tbody>
   </table>
 </div><div class="button-container">
-  <button onclick="downloadPdf()">Print</button>
+  <button onclick="downloadPdf()" download>Print</button>
   <button onclick="clearAllData()">Clear All</button>
 </div>
   
@@ -130,7 +130,6 @@ button:hover {
   let localData = JSON.parse(localStorage.getItem("marksData")) || [];
 
   function addRow() {
-    
     const name = document.getElementById("name").value;
     const math = parseFloat(document.getElementById("math").value);
     const science = parseFloat(document.getElementById("science").value);
@@ -153,7 +152,7 @@ button:hover {
     const total = math + science + sst + sanskrit + english;
     const percentage = ((total / fullMarks) * 100).toFixed(2);
 
-    const row = [ name, math, science, sst, sanskrit, english, total, percentage];
+    const row = [name, math, science, sst, sanskrit, english, total, percentage];
     localData.push(row);
     localStorage.setItem("marksData", JSON.stringify(localData));
 
@@ -161,25 +160,29 @@ button:hover {
   }
 
   function renderTable() {
+    // Sort data by total marks (index 6) in descending order
+    localData.sort((a, b) => b[6] - a[6]);
+
     marksBody.innerHTML = "";
     localData.forEach((row, index) => {
-           const tr = document.createElement("tr");
+      const tr = document.createElement("tr");
 
-// Insert Rank cell
-const rankTd = document.createElement("td");
-rankTd.innerText = index + 1;
-tr.appendChild(rankTd);
+      // Insert Rank cell
+      const rankTd = document.createElement("td");
+      rankTd.innerText = index + 1;
+      tr.appendChild(rankTd);
+
       row.forEach((cell, idx) => {
         const td = document.createElement("td");
         td.innerText = cell;
 
         if (idx >= 6) td.classList.add("no-copy");
-        if (idx > 0 && idx < 6) td.contentEditable = true; // Allow editing name and marks, not rank
-
+        if (idx > 0 && idx < 6) td.contentEditable = true; // Allow editing marks
         if (idx === 6) addLongPressDelete(td, index);
 
         tr.appendChild(td);
       });
+
       marksBody.appendChild(tr);
     });
   }
@@ -215,38 +218,6 @@ tr.appendChild(rankTd);
     html2pdf().set(opt).from(element).save();
   }
 
-  new Sortable(marksBody, {
-    animation: 150,
-    handle: 'td:nth-child(9)', // Percentage column as handle
-    draggable: 'tr',
-    onEnd: function () {
-      const newOrder = Array.from(marksBody.children).map(row => {
-        const cells = Array.from(row.children);
-        
-        const name = cells[1].innerText;
-        const math = parseFloat(cells[2].innerText);
-        const science = parseFloat(cells[3].innerText);
-        const sst = parseFloat(cells[4].innerText);
-        const sanskrit = parseFloat(cells[5].innerText);
-        const english = parseFloat(cells[6].innerText);
-        const total = math + science + sst + sanskrit + english;
-          const percentage = ((total / fullMarks) * 100).toFixed(2);
-        // Get total and percentage from original data
-    const oldTotal = parseFloat(cells[7].innerText);
-    const oldPercentage = parseFloat(cells[8].innerText);
-
-    // Recalculate fullMarks from stored percentage (reverse)
-    const fullMarks = (oldTotal * 100) / oldPercentage;
-
-        return [name, math, science, sst, sanskrit, english, total, percentage];
-      });
-
-      localData = newOrder;
-      localStorage.setItem("marksData", JSON.stringify(localData));
-      renderTable();
-    }
-  });
-
   function clearAllData() {
     if (confirm("Are you sure you want to clear all data?")) {
       localData = [];
@@ -257,5 +228,8 @@ tr.appendChild(rankTd);
 
   renderTable();
 </script>
+  
+  
+  
 </body>
 </html>
