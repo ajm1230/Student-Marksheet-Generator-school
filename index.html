@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Student Marks Table</title>
   <style>
     body {
@@ -79,10 +79,21 @@
       font-size: 14px;
       width: 120px;
     }
-  </style>
 
-  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@700&display=swap" rel="stylesheet">
-  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+    #downloadGenerated {
+      display: none;
+      margin-top: 15px;
+    }
+
+    .class-info {
+      text-align: center;
+      font-size: 18px;
+      font-weight: bold;
+    }
+  </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-storage-compat.js"></script>
 </head>
 <body>
   <h1>NUCLEUS PUBLIC SCHOOL</h1>
@@ -90,6 +101,7 @@
 
   <div class="input-container">
     <input id="rank" placeholder="Rank">
+    <input id="class" placeholder="Class">
     <input id="name" placeholder="Name">
     <input id="math" placeholder="Mathematics">
     <input id="science" placeholder="Science">
@@ -101,6 +113,7 @@
   </div>
 
   <div id="table1">
+    <div class="class-info" id="classDisplay"></div>
     <table>
       <thead>
         <tr>
@@ -120,17 +133,100 @@
   </div>
 
   <div class="button-container">
-    <button onclick="downloadPdf()">Print</button>
+    <button onclick="generateAndUploadPdf()">Generate & Upload PDF</button>
+    <button id="downloadGenerated">Download PDF</button>
     <button onclick="clearAllData()">Clear All</button>
   </div>
 
-  <!-- Firebase SDKs -->
-  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-storage-compat.js"></script>
-  <script>
-    // ✅ Replace with your actual Firebase config
-    const firebaseConfig = {
-       apiKey: "AIzaSyD3uQEvD7iTT5Nyb1RQUP6bFDEsfAw_x5o",
+<script>
+  const marksBody = document.getElementById("marksBody");
+  let localData = JSON.parse(localStorage.getItem("marksData")) || [];
+
+  function addRow() {
+    const classValue = document.getElementById("class").value;
+    const name = document.getElementById("name").value;
+    const math = parseFloat(document.getElementById("math").value);
+    const science = parseFloat(document.getElementById("science").value);
+    const sst = parseFloat(document.getElementById("sst").value);
+    const sanskrit = parseFloat(document.getElementById("sanskrit").value);
+    const english = parseFloat(document.getElementById("english").value);
+    const fullMarks = parseFloat(document.getElementById("fullmarks").value);
+
+    if (!name || isNaN(math) || isNaN(science) || isNaN(sst) || isNaN(sanskrit) || isNaN(english) || isNaN(fullMarks)) {
+      alert("Please fill all fields correctly.");
+      return;
+    }
+
+    const maxMark = fullMarks / 5;
+    if ([math, science, sst, sanskrit, english].some(m => m > maxMark)) {
+      alert(`Each subject mark must not exceed ${maxMark}`);
+      return;
+    }
+
+    const total = math + science + sst + sanskrit + english;
+    const percentage = ((total / fullMarks) * 100).toFixed(2);
+    const row = [name, math, science, sst, sanskrit, english, total, percentage];
+
+    localData.push(row);
+    localStorage.setItem("marksData", JSON.stringify(localData));
+    document.getElementById("classDisplay").innerText = classValue ? `Class: ${classValue}` : '';
+    renderTable();
+  }
+
+  function renderTable() {
+    localData.sort((a, b) => b[6] - a[6]);
+    marksBody.innerHTML = "";
+
+    localData.forEach((row, index) => {
+      const tr = document.createElement("tr");
+      const rankTd = document.createElement("td");
+      rankTd.innerText = index + 1;
+      tr.appendChild(rankTd);
+
+      row.forEach((cell, idx) => {
+        const td = document.createElement("td");
+        td.innerText = cell;
+
+        if (idx >= 6) td.classList.add("no-copy");
+        if (idx > 0 && idx < 6) td.contentEditable = true;
+        if (idx === 6) addLongPressDelete(td, index);
+
+        tr.appendChild(td);
+      });
+
+      marksBody.appendChild(tr);
+    });
+  }
+
+  function addLongPressDelete(cell, index) {
+    let timer;
+    cell.addEventListener("touchstart", () => {
+      timer = setTimeout(() => {
+        if (confirm("Delete this row?")) {
+          localData.splice(index, 1);
+          localStorage.setItem("marksData", JSON.stringify(localData));
+          renderTable();
+        }
+      }, 700);
+    });
+    cell.addEventListener("touchend", () => clearTimeout(timer));
+    cell.addEventListener("touchcancel", () => clearTimeout(timer));
+  }
+
+  function clearAllData() {
+    if (confirm("Clear all data?")) {
+      localData = [];
+      localStorage.removeItem("marksData");
+      document.getElementById("classDisplay").innerText = '';
+      renderTable();
+    }
+  }
+
+  renderTable();
+
+  // Firebase config
+  const firebaseConfig = {
+    apiKey: "AIzaSyD3uQEvD7iTT5Nyb1RQUP6bFDEsfAw_x5o",
   authDomain: "d-game-aa338.firebaseapp.com",
   databaseURL: "https://d-game-aa338-default-rtdb.firebaseio.com",
   projectId: "d-game-aa338",
@@ -138,132 +234,45 @@
   messagingSenderId: "537592818882",
   appId: "1:537592818882:web:e9ba9c65b354e55d165f5b",
   measurementId: "G-T2VVM9FKHP"
+  };
+
+  firebase.initializeApp(firebaseConfig);
+  const storage = firebase.storage();
+
+  function generateAndUploadPdf() {
+    const classValue = document.getElementById("class").value;
+    document.getElementById("classDisplay").innerText = classValue ? `Class: ${classValue}` : '';
+
+    const element = document.getElementById("table1");
+    const timestamp = new Date().toISOString().replace(/[:.-]/g, '_');
+    const filename = `student_marks_sheet_${timestamp}.pdf`;
+
+    const opt = {
+      margin: 0.5,
+      filename: filename,
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2 },
+      jsPDF: { unit: 'in', format: 'letter', orientation: 'landscape' }
     };
 
-    firebase.initializeApp(firebaseConfig);
-    const storage = firebase.storage();
-  </script>
-
-  <!-- html2pdf -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
-
-  <script>
-    const marksBody = document.getElementById("marksBody");
-    let localData = JSON.parse(localStorage.getItem("marksData")) || [];
-
-    function addRow() {
-      const name = document.getElementById("name").value;
-      const math = parseFloat(document.getElementById("math").value);
-      const science = parseFloat(document.getElementById("science").value);
-      const sst = parseFloat(document.getElementById("sst").value);
-      const sanskrit = parseFloat(document.getElementById("sanskrit").value);
-      const english = parseFloat(document.getElementById("english").value);
-      const fullMarks = parseFloat(document.getElementById("fullmarks").value);
-
-      if (!name || isNaN(math) || isNaN(science) || isNaN(sst) || isNaN(sanskrit) || isNaN(english) || isNaN(fullMarks)) {
-        alert("Please fill all fields correctly.");
-        return;
-      }
-
-      const maxMark = fullMarks / 5;
-      if ([math, science, sst, sanskrit, english].some(m => m > maxMark)) {
-        alert(`Each subject mark must not exceed ${maxMark}`);
-        return;
-      }
-
-      const total = math + science + sst + sanskrit + english;
-      const percentage = ((total / fullMarks) * 100).toFixed(2);
-
-      const row = [name, math, science, sst, sanskrit, english, total, percentage];
-      localData.push(row);
-      localStorage.setItem("marksData", JSON.stringify(localData));
-
-      renderTable();
-    }
-
-    function renderTable() {
-      localData.sort((a, b) => b[6] - a[6]);
-      marksBody.innerHTML = "";
-      localData.forEach((row, index) => {
-        const tr = document.createElement("tr");
-
-        const rankTd = document.createElement("td");
-        rankTd.innerText = index + 1;
-        tr.appendChild(rankTd);
-
-        row.forEach((cell, idx) => {
-          const td = document.createElement("td");
-          td.innerText = cell;
-
-          if (idx >= 6) td.classList.add("no-copy");
-          if (idx > 0 && idx < 6) td.contentEditable = true;
-          if (idx === 6) addLongPressDelete(td, index);
-
-          tr.appendChild(td);
-        });
-
-        marksBody.appendChild(tr);
-      });
-    }
-
-    function addLongPressDelete(cell, index) {
-      let timer;
-      cell.addEventListener("touchstart", () => {
-        timer = setTimeout(() => {
-          if (confirm("Delete this row?")) {
-            localData.splice(index, 1);
-            localStorage.setItem("marksData", JSON.stringify(localData));
-            renderTable();
-          }
-        }, 700);
-      });
-      cell.addEventListener("touchend", () => clearTimeout(timer));
-      cell.addEventListener("touchcancel", () => clearTimeout(timer));
-    }
-
-    async function downloadPdf() {
-      const element = document.getElementById('table1');
-      const timestamp = new Date().toISOString().replace(/[:.-]/g, '_');
-      const filename = `student_marks_sheet_${timestamp}.pdf`;
-
-      const opt = {
-        margin: 0.5,
-        filename: filename,
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2 },
-        jsPDF: { unit: 'in', format: 'letter', orientation: 'landscape' }
+    html2pdf().set(opt).from(element).outputPdf('blob').then(function(pdfBlob) {
+      const storageRef = storage.ref().child(`pdfs/${filename}`);
+      return storageRef.put(pdfBlob).then(() => storageRef.getDownloadURL());
+    }).then(downloadURL => {
+      document.getElementById("downloadGenerated").style.display = 'inline-block';
+      document.getElementById("downloadGenerated").onclick = () => {
+        window.open(downloadURL, '_blank');
       };
 
-      const pdfBlob = await html2pdf().set(opt).from(element).outputPdf('blob');
-
-      const storageRef = storage.ref().child(`marksheets/${filename}`);
-      await storageRef.put(pdfBlob);
-      const downloadURL = await storageRef.getDownloadURL();
-
-      await fetch("https://formspree.io/f/xgvkvowv", {
-        method: "POST",
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
+      fetch('https://formspree.io/f/xgvkvowv', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          message: `Student marksheet generated by school`,
-          pdfLink: downloadURL
+          message: `Student marksheet generated by school\n${downloadURL}`
         })
       });
-
-      alert("PDF saved, uploaded to Firebase, and Formspree notified!");
-    }
-
-    function clearAllData() {
-      if (confirm("Are you sure you want to clear all data?")) {
-        localData = [];
-        localStorage.removeItem("marksData");
-        renderTable();
-      }
-    }
-
-    renderTable();
-  </script>
+    });
+  }
+</script>
 </body>
-  </html>
+</html>
