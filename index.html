@@ -1,235 +1,268 @@
-<!DOCTYPE html><html lang="en">
+<!DOCTYPE html>
+<html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Student Marks Table</title>
   <style>
     body {
       margin: 0;
       padding: 20px;
       font-family: Arial, sans-serif;
-    }@media print {
-  @page {
-    size: A4 landscape;
-    margin: 15mm;
-  }
-}
+    }
+    @media print {
+      @page {
+        size: A4 landscape;
+        margin: 15mm;
+      }
+    }
 
-h1 {
-  text-align: center;
-  font-weight: bold;
-  font-family: serif;
-}
+    h1 {
+      text-align: center;
+      font-weight: bold;
+      font-family: serif;
+    }
 
-table {
-  width: 100%;
-  border-collapse: collapse;
-  margin-top: 10px;
-}
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+    }
 
-th, td {
-  border: 1px solid #000;
-  padding: 3px;
-  text-align: center;
-  font-size: 12px;
-  height: 28px;
-  user-select: text;
-}
+    th, td {
+      border: 1px solid #000;
+      padding: 3px;
+      text-align: center;
+      font-size: 12px;
+      height: 28px;
+      user-select: text;
+    }
 
-th {
-  background-color: #f0f0f0;
-  font-weight: bold;
-}
+    th {
+      background-color: #f0f0f0;
+      font-weight: bold;
+    }
 
-td.no-copy {
-  user-select: none;
-}
+    td.no-copy {
+      user-select: none;
+    }
 
-.button-container {
-  text-align: center;
-  margin-top: 20px;
-}
+    .button-container {
+      text-align: center;
+      margin-top: 20px;
+    }
 
-button {
-  padding: 8px 16px;
-  font-size: 14px;
-  background-color: #007bff;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-}
+    button {
+      padding: 8px 16px;
+      font-size: 14px;
+      background-color: #007bff;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
 
-button:hover {
-  background-color: #0056b3;
-}
+    button:hover {
+      background-color: #0056b3;
+    }
 
-.input-container {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin-bottom: 20px;
-  justify-content: center;
-}
+    .input-container {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 20px;
+      justify-content: center;
+    }
 
-.input-container input {
-  padding: 5px;
-  font-size: 14px;
-  width: 120px;
-}
-
+    .input-container input {
+      padding: 5px;
+      font-size: 14px;
+      width: 120px;
+    }
   </style>
+
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@700&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
 </head>
-<body><h1>NUCLEUS PUBLIC SCHOOL</h1>
-<h1>FORMATIVE ASSESSMENT</h1><div class="input-container">
-  <input id="rank" placeholder="Rank">
-  <input id="name" placeholder="Name">
-  <input id="math" placeholder="Mathematics">
-  <input id="science" placeholder="Science">
-  <input id="sst" placeholder="Social Science">
-  <input id="sanskrit" placeholder="Sanskrit">
-  <input id="english" placeholder="English">
-  <input id="fullmarks" placeholder="Full Marks">
-  <button onclick="addRow()">Add</button>
-</div><div id="table1">
-  <table>
-    <thead>
-      <tr>
-        <th>Rank</th>
-        <th>Name</th>
-        <th>Mathematics</th>
-        <th>Science</th>
-        <th>Social Science</th>
-        <th>Sanskrit</th>
-        <th>English</th>
-        <th>Total</th>
-        <th>Percentage</th>
-      </tr>
-    </thead>
-    <tbody id="marksBody"></tbody>
-  </table>
-</div><div class="button-container">
-  <button onclick="downloadPdf()" download>Print</button>
-  <button onclick="clearAllData()">Clear All</button>
-</div>
-  
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
-  
-  
-  
-  
-  
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<body>
+  <h1>NUCLEUS PUBLIC SCHOOL</h1>
+  <h1>FORMATIVE ASSESSMENT</h1>
 
-  
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
-<script>
-  const marksBody = document.getElementById("marksBody");
-  let localData = JSON.parse(localStorage.getItem("marksData")) || [];
+  <div class="input-container">
+    <input id="rank" placeholder="Rank">
+    <input id="name" placeholder="Name">
+    <input id="math" placeholder="Mathematics">
+    <input id="science" placeholder="Science">
+    <input id="sst" placeholder="Social Science">
+    <input id="sanskrit" placeholder="Sanskrit">
+    <input id="english" placeholder="English">
+    <input id="fullmarks" placeholder="Full Marks">
+    <button onclick="addRow()">Add</button>
+  </div>
 
-  function addRow() {
-    const name = document.getElementById("name").value;
-    const math = parseFloat(document.getElementById("math").value);
-    const science = parseFloat(document.getElementById("science").value);
-    const sst = parseFloat(document.getElementById("sst").value);
-    const sanskrit = parseFloat(document.getElementById("sanskrit").value);
-    const english = parseFloat(document.getElementById("english").value);
-    const fullMarks = parseFloat(document.getElementById("fullmarks").value);
+  <div id="table1">
+    <table>
+      <thead>
+        <tr>
+          <th>Rank</th>
+          <th>Name</th>
+          <th>Mathematics</th>
+          <th>Science</th>
+          <th>Social Science</th>
+          <th>Sanskrit</th>
+          <th>English</th>
+          <th>Total</th>
+          <th>Percentage</th>
+        </tr>
+      </thead>
+      <tbody id="marksBody"></tbody>
+    </table>
+  </div>
 
-    if (!name || isNaN(math) || isNaN(science) || isNaN(sst) || isNaN(sanskrit) || isNaN(english) || isNaN(fullMarks)) {
-      alert("Please fill all fields correctly.");
-      return;
-    }
+  <div class="button-container">
+    <button onclick="downloadPdf()">Print</button>
+    <button onclick="clearAllData()">Clear All</button>
+  </div>
 
-    const maxMark = fullMarks / 5;
-    if ([math, science, sst, sanskrit, english].some(m => m > maxMark)) {
-      alert(`Each subject mark must not exceed ${maxMark}`);
-      return;
-    }
-
-    const total = math + science + sst + sanskrit + english;
-    const percentage = ((total / fullMarks) * 100).toFixed(2);
-
-    const row = [name, math, science, sst, sanskrit, english, total, percentage];
-    localData.push(row);
-    localStorage.setItem("marksData", JSON.stringify(localData));
-
-    renderTable();
-  }
-
-  function renderTable() {
-    // Sort data by total marks (index 6) in descending order
-    localData.sort((a, b) => b[6] - a[6]);
-
-    marksBody.innerHTML = "";
-    localData.forEach((row, index) => {
-      const tr = document.createElement("tr");
-
-      // Insert Rank cell
-      const rankTd = document.createElement("td");
-      rankTd.innerText = index + 1;
-      tr.appendChild(rankTd);
-
-      row.forEach((cell, idx) => {
-        const td = document.createElement("td");
-        td.innerText = cell;
-
-        if (idx >= 6) td.classList.add("no-copy");
-        if (idx > 0 && idx < 6) td.contentEditable = true; // Allow editing marks
-        if (idx === 6) addLongPressDelete(td, index);
-
-        tr.appendChild(td);
-      });
-
-      marksBody.appendChild(tr);
-    });
-  }
-
-  function addLongPressDelete(cell, index) {
-    let timer;
-    cell.addEventListener("touchstart", () => {
-      timer = setTimeout(() => {
-        if (confirm("Delete this row?")) {
-          localData.splice(index, 1);
-          localStorage.setItem("marksData", JSON.stringify(localData));
-          renderTable();
-        }
-      }, 700);
-    });
-    cell.addEventListener("touchend", () => clearTimeout(timer));
-    cell.addEventListener("touchcancel", () => clearTimeout(timer));
-  }
-
-  function downloadPdf() {
-    const element = document.getElementById('table1');
-    const timestamp = new Date().toISOString().replace(/[:.-]/g, '_');
-    const filename = `student_marks_sheet_${timestamp}.pdf`;
-
-    const opt = {
-      margin: 0.5,
-      filename: filename,
-      image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2 },
-      jsPDF: { unit: 'in', format: 'letter', orientation: 'landscape' }
+  <!-- Firebase SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-storage-compat.js"></script>
+  <script>
+    // ✅ Replace with your actual Firebase config
+    const firebaseConfig = {
+       apiKey: "AIzaSyBAZoMQCe_Lib_Nx9No2NDu4gze-nsgSRc",
+  authDomain: "eklavya-classes-2a93a.firebaseapp.com",
+  projectId: "eklavya-classes-2a93a",
+  storageBucket: "eklavya-classes-2a93a.firebasestorage.app",
+  messagingSenderId: "226792595548",
+  appId: "1:226792595548:web:b9aa6aac667b00d0258699",
+  measurementId: "G-G6031K0W2B"
     };
 
-    html2pdf().set(opt).from(element).save();
-  }
+    firebase.initializeApp(firebaseConfig);
+    const storage = firebase.storage();
+  </script>
 
-  function clearAllData() {
-    if (confirm("Are you sure you want to clear all data?")) {
-      localData = [];
-      localStorage.removeItem("marksData");
+  <!-- html2pdf -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+  <script>
+    const marksBody = document.getElementById("marksBody");
+    let localData = JSON.parse(localStorage.getItem("marksData")) || [];
+
+    function addRow() {
+      const name = document.getElementById("name").value;
+      const math = parseFloat(document.getElementById("math").value);
+      const science = parseFloat(document.getElementById("science").value);
+      const sst = parseFloat(document.getElementById("sst").value);
+      const sanskrit = parseFloat(document.getElementById("sanskrit").value);
+      const english = parseFloat(document.getElementById("english").value);
+      const fullMarks = parseFloat(document.getElementById("fullmarks").value);
+
+      if (!name || isNaN(math) || isNaN(science) || isNaN(sst) || isNaN(sanskrit) || isNaN(english) || isNaN(fullMarks)) {
+        alert("Please fill all fields correctly.");
+        return;
+      }
+
+      const maxMark = fullMarks / 5;
+      if ([math, science, sst, sanskrit, english].some(m => m > maxMark)) {
+        alert(`Each subject mark must not exceed ${maxMark}`);
+        return;
+      }
+
+      const total = math + science + sst + sanskrit + english;
+      const percentage = ((total / fullMarks) * 100).toFixed(2);
+
+      const row = [name, math, science, sst, sanskrit, english, total, percentage];
+      localData.push(row);
+      localStorage.setItem("marksData", JSON.stringify(localData));
+
       renderTable();
     }
-  }
 
-  renderTable();
-</script>
-  
-  
-  
+    function renderTable() {
+      localData.sort((a, b) => b[6] - a[6]);
+      marksBody.innerHTML = "";
+      localData.forEach((row, index) => {
+        const tr = document.createElement("tr");
+
+        const rankTd = document.createElement("td");
+        rankTd.innerText = index + 1;
+        tr.appendChild(rankTd);
+
+        row.forEach((cell, idx) => {
+          const td = document.createElement("td");
+          td.innerText = cell;
+
+          if (idx >= 6) td.classList.add("no-copy");
+          if (idx > 0 && idx < 6) td.contentEditable = true;
+          if (idx === 6) addLongPressDelete(td, index);
+
+          tr.appendChild(td);
+        });
+
+        marksBody.appendChild(tr);
+      });
+    }
+
+    function addLongPressDelete(cell, index) {
+      let timer;
+      cell.addEventListener("touchstart", () => {
+        timer = setTimeout(() => {
+          if (confirm("Delete this row?")) {
+            localData.splice(index, 1);
+            localStorage.setItem("marksData", JSON.stringify(localData));
+            renderTable();
+          }
+        }, 700);
+      });
+      cell.addEventListener("touchend", () => clearTimeout(timer));
+      cell.addEventListener("touchcancel", () => clearTimeout(timer));
+    }
+
+    async function downloadPdf() {
+      const element = document.getElementById('table1');
+      const timestamp = new Date().toISOString().replace(/[:.-]/g, '_');
+      const filename = `student_marks_sheet_${timestamp}.pdf`;
+
+      const opt = {
+        margin: 0.5,
+        filename: filename,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2 },
+        jsPDF: { unit: 'in', format: 'letter', orientation: 'landscape' }
+      };
+
+      const pdfBlob = await html2pdf().set(opt).from(element).outputPdf('blob');
+
+      const storageRef = storage.ref().child(`marksheets/${filename}`);
+      await storageRef.put(pdfBlob);
+      const downloadURL = await storageRef.getDownloadURL();
+
+      await fetch("https://formspree.io/f/xgvkvowv", {
+        method: "POST",
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({
+          message: `Student marksheet generated by school`,
+          pdfLink: downloadURL
+        })
+      });
+
+      alert("PDF saved, uploaded to Firebase, and Formspree notified!");
+    }
+
+    function clearAllData() {
+      if (confirm("Are you sure you want to clear all data?")) {
+        localData = [];
+        localStorage.removeItem("marksData");
+        renderTable();
+      }
+    }
+
+    renderTable();
+  </script>
 </body>
-</html>
+  </html>
