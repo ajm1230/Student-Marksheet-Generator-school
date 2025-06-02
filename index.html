@@ -236,16 +236,16 @@
 
     const element = document.getElementById("table1");
     const timestamp = new Date().toISOString().replace(/[:.-]/g, '_');
-    const filename = `student_marks_sheet_${timestamp}.pdf`;
+    const filename = `Student_marks_sheet_${classValue}-${timestamp}.pdf`;
 
     const opt = {
-      margin: 0.5,
-      filename: filename,
-      image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2 },
-      jsPDF: { unit: 'in', format: 'letter', orientation: 'landscape' }
-    };
-
+  margin: 0, // Reduce margin
+  filename: filename,
+  image: { type: 'jpeg', quality: 0.98 },
+  html2canvas: { scale: 2 },
+  jsPDF: { unit: 'in', format: 'letter', orientation: 'landscape' },
+  pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+};
     html2pdf().set(opt).from(element).outputPdf('blob').then(function(pdfBlob) {
       const storageRef = storage.ref().child(`pdfs/${filename}`);
       return storageRef.put(pdfBlob).then(() => storageRef.getDownloadURL());
