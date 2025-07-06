@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Dynamic Student Marks Table + PDF</title>
+<style>
+  body { margin:0; padding:20px; font-family:Arial,sans-serif; }
+  h1 { text-align:center; font-weight:bold; font-family:serif; }
+  table { width:100%; border-collapse:collapse; margin-top:10px; }
+  th, td { border:1px solid #000; padding:3px; text-align:center; font-size:12px; height:28px; }
+  th { background-color:#f0f0f0; }
+  .button-container { text-align:center; margin-top:20px; }
+  button { padding:8px 16px; font-size:14px; background:#007bff; color:#fff; border:none; border-radius:4px; cursor:pointer; }
+  button:hover { background:#0056b3; }
+  .input-container { display:flex; flex-wrap:wrap; gap:10px; margin-bottom:20px; justify-content:center; }
+  .input-container input { padding:5px; font-size:14px; width:120px; }
+  .class-info { text-align:center; font-size:18px; font-weight:bold; }
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-storage-compat.js"></script>
+</head>
+<body>
+
+<h1>NUCLEUS PUBLIC SCHOOL</h1>
+<h1>FORMATIVE ASSESSMENT</h1>
+
+<div class="input-container">
+  <input id="class" placeholder="Class">
+  <input id="newSubject" placeholder="Subject,T-mark">
+  <button onclick="addSubject()">Add Subject</button>
+  <input id="name" placeholder="Name">
+  <!-- dynamic subject inputs will appear here -->
+  <button onclick="addRow()">Add Student</button>
+</div>
+
+<div class="class-info" id="classDisplay"></div>
+
+<div id="tableArea">
+<table>
+  <thead><tr id="tableHeader"></tr></thead>
+  <tbody id="marksBody"></tbody>
+</table>
+</div>
+
+<div class="button-container">
+  <button onclick="generateAndUploadPdf()">Generate & Upload PDF</button>
+  <button id="downloadGenerated" style="display:none;">Download PDF</button>
+  <button onclick="clearAllData()">Clear All</button>
+</div>
+
+<script>
+let subjects = JSON.parse(localStorage.getItem("subjects")) || [];
+let students = JSON.parse(localStorage.getItem("students")) || [];
+
+window.onload = () => {
+  document.getElementById("class").value = localStorage.getItem("classValue") || "";
+  updateClassDisplay();
+  renderSubjectsInputs();
+  renderTable();
+};
+
+// Add subject
+function addSubject() {
+  const input = document.getElementById("newSubject").value.trim();
+  const [name, tmarkStr] = input.split(",");
+  const tmark = parseFloat(tmarkStr);
+  if (!name || isNaN(tmark) || tmark<=0) { alert("Enter as Subject,T-mark"); return; }
+  subjects.push({ name, tmark });
+  localStorage.setItem("subjects", JSON.stringify(subjects));
+  document.getElementById("newSubject").value="";
+  renderSubjectsInputs(); renderTable();
+}
+
+// Render dynamic subject inputs
+function renderSubjectsInputs() {
+  document.querySelectorAll(".subject-input").forEach(e=>e.remove());
+  const container = document.querySelector(".input-container");
+  subjects.forEach(sub=>{
+    const input=document.createElement("input");
+    input.placeholder=sub.name; input.id=`subject-${sub.name}`;
+    input.className="subject-input";
+    container.insertBefore(input, container.querySelector('button[onclick="addRow()"]'));
+  });
+}
+
+// Add student
+function addRow() {
+  const name = document.getElementById("name").value.trim();
+  const classValue = document.getElementById("class").value.trim();
+  if (!name) { alert("Enter student name"); return; }
+  const marks=[];
+  for (const sub of subjects) {
+    const val = parseFloat(document.getElementById(`subject-${sub.name}`).value);
+    if (isNaN(val) || val<0 || val>sub.tmark) {
+      alert(`Valid marks for ${sub.name} (max ${sub.tmark})`); return;
+    }
+    marks.push(val);
+  }
+  const total=marks.reduce((a,b)=>a+b,0);
+  const fullMarks=subjects.reduce((a,b)=>a+b.tmark,0);
+  const percentage=((total/fullMarks)*100).toFixed(2);
+  students.push({ name, marks, total, percentage });
+  localStorage.setItem("students", JSON.stringify(students));
+  localStorage.setItem("classValue", classValue);
+  document.getElementById("name").value="";
+  subjects.forEach(s=>document.getElementById(`subject-${s.name}`).value="");
+  updateClassDisplay(); renderTable();
+}
+
+// Table render
+function renderTable() {
+  students.sort((a,b)=>b.total - a.total);
+  const header=document.getElementById("tableHeader");
+  header.innerHTML="<th>Rank</th><th>Name</th>";
+  subjects.forEach(s=>header.innerHTML+=`<th>${s.name}</th>`);
+  header.innerHTML+="<th>Total</th><th>Percentage</th>";
+  const body=document.getElementById("marksBody"); body.innerHTML="";
+  students.forEach((stu,idx)=>{
+    const tr=document.createElement("tr");
+    tr.innerHTML=`<td>${idx+1}</td><td>${stu.name}</td>`;
+    stu.marks.forEach(m=>tr.innerHTML+=`<td>${m}</td>`);
+    tr.innerHTML+=`<td>${stu.total}</td><td>${stu.percentage}</td>`;
+    body.appendChild(tr);
+  });
+}
+
+// Update class name
+function updateClassDisplay(){
+  const c=document.getElementById("class").value.trim();
+  document.getElementById("classDisplay").innerText= c ? `Class: ${c}` : "";
+}
+
+// Clear data
+function clearAllData(){
+  if(confirm("Clear all?")) {
+    subjects=[]; students=[];
+    localStorage.removeItem("subjects"); localStorage.removeItem("students"); localStorage.removeItem("classValue");
+    renderSubjectsInputs(); renderTable(); document.getElementById("classDisplay").innerText="";
+  }
+}
+
+// Firebase config
+const firebaseConfig = {
+  apiKey:"AIzaSyD3uQEvD7iTT5Nyb1RQUP6bFDEsfAw_x5o",
+  authDomain:"d-game-aa338.firebaseapp.com",
+  projectId:"d-game-aa338",
+  storageBucket:"d-game-aa338.appspot.com",
+  messagingSenderId:"537592818882",
+  appId:"1:537592818882:web:e9ba9c65b354e55d165f5b",
+  measurementId:"G-T2VVM9FKHP"
+};
+firebase.initializeApp(firebaseConfig);
+const storage = firebase.storage();
+
+// PDF generate & upload
+function generateAndUploadPdf(){
+  const classValue = document.getElementById("class").value.trim() || "Unknown";
+
+  // Create new <div> header with class name
+  const headerDiv = document.createElement("div");
+  headerDiv.style.textAlign = "center";
+  headerDiv.style.fontWeight = "bold";
+  headerDiv.style.fontSize = "18px";
+  headerDiv.style.marginBottom = "5px";
+  headerDiv.innerText = `Class: ${classValue}`;
+
+  const tableArea = document.getElementById("tableArea");
+  tableArea.insertBefore(headerDiv, tableArea.firstChild); // add at top
+
+  const timestamp = new Date().toISOString().replace(/[:.-]/g,'_');
+  const filename = `Student_marks_${classValue}-${timestamp}.pdf`;
+
+  const opt = {
+    margin:0.5,
+    filename,
+    image:{type:'jpeg',quality:0.98},
+    html2canvas:{scale:2},
+    jsPDF:{unit:'in',format:'letter',orientation:'landscape'}
+  };
+
+  html2pdf().set(opt).from(tableArea).outputPdf('blob').then(blob=>{
+    // remove header after PDF generated
+    tableArea.removeChild(headerDiv);
+
+    // upload to Firebase
+    const ref=storage.ref().child(`pdfs/${filename}`);
+    return ref.put(blob).then(()=>ref.getDownloadURL());
+  }).then(url=>{
+    console.log("PDF uploaded, URL:", url);
+
+    // send to Formspree
+    return fetch('https://formspree.io/f/xgvkvowv',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({ message:`Student marksheet generated:\n${url}` })
+    }).then(()=>url);
+  }).then(url=>{
+    // Show download button and open URL
+    const btn=document.getElementById("downloadGenerated");
+    btn.style.display='inline-block';
+    btn.onclick=()=>window.open(url,'_blank');
+    window.open(url,'_blank');
+  }).catch(err=>{
+    console.error("Error:", err);
+    alert("Failed to generate or upload PDF.");
+  });
+}
+</script>
+</body>
+</html>
