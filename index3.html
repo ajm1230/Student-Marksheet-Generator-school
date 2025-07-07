@@ -4,6 +4,19 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>Dynamic Student Marks Table + PDF</title>
+  <style>
+    #assessmentInput {
+    padding: 6px 10px;
+    border:none;
+    border-radius: 4px;
+    font-size: 14px;
+    width: 250px;
+  }
+  #outputText {
+    margin-top: 10px;
+    font-weight: bold;
+  }
+</style>
 <style>
   body { margin:0; padding:20px; font-family:Arial,sans-serif; }
   h1 { text-align:center; font-weight:bold; font-family:serif; }
@@ -13,7 +26,7 @@
   .button-container { text-align:center; margin-top:20px; }
   button { padding:8px 16px; font-size:14px; background:#007bff; color:#fff; border:none; border-radius:4px; cursor:pointer; }
   button:hover { background:#0056b3; }
-  .input-container { display:flex; flex-wrap:wrap; gap:10px; margin-bottom:20px; justify-content:center; }
+  .input-container, .input-container2 { display:flex; flex-wrap:wrap; gap:10px; margin-bottom:20px; justify-content:center; }
   .input-container input { padding:5px; font-size:14px; width:120px; }
   .class-info { text-align:center; font-size:18px; font-weight:bold; }
   
@@ -26,6 +39,12 @@
   
   thead { display: table-header-group; }
 tr { page-break-inside: avoid; }
+  .subject-input,.exam-type,#name, #class, #newSubject {
+  padding: 6px 10px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 18px;
+  }
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
@@ -33,14 +52,36 @@ tr { page-break-inside: avoid; }
 </head>
 <body>
 
-<h1>NUCLEUS PUBLIC SCHOOL</h1>
-<h1>FORMATIVE ASSESSMENT 1</h1>
-
-<div class="input-container">
+  <h1>Marksheet Generator</h1>
+  <button onclick="location.reload();" 
+  style="
+    padding: 3px; 
+    text-align: center; 
+    position: fixed; 
+    top: 3%; 
+    left: 50%; 
+    transform: translate(-50%, -50%);
+    cursor: pointer;
+  ">
+  Save Changes
+</button>
+  <div class="exam-type">
+    
+    <input list="assessmentList" id="assessmentInput" placeholder="Type or select assessment">
+<datalist id="assessmentList">
+  <option value="FORMATIVE ASSESSMENT">
+  <option value="SUMMATIVE ASSESSMENT">
+</datalist> 
+  </div>
+  <hr>
+  <div class="input-container">
   <input id="class" placeholder="Class">
   <input id="newSubject" placeholder="Subject,T-mark">
   <button onclick="addSubject()">Add Subject</button>
-  <input id="name" placeholder="Name">
+</div>
+  <hr>
+  <div class="input-container2">
+  <input id="name"  placeholder="Name">
   <!-- dynamic subject inputs will appear here -->
   <button onclick="addRow()">Add Student</button>
 </div>
@@ -98,11 +139,11 @@ function addSubject() {
 // Render dynamic subject inputs
 function renderSubjectsInputs() {
   document.querySelectorAll(".subject-input").forEach(e=>e.remove());
-  const container = document.querySelector(".input-container");
+  const container = document.querySelector(".input-container2");
   subjects.forEach(sub=>{
     const input=document.createElement("input");
     input.placeholder=sub.name; input.id=`subject-${sub.name}`;
-    input.className="subject-input no-select";
+    input.className="subject-input no-select ";
     container.insertBefore(input, container.querySelector('button[onclick="addRow()"]'));
   });
 }
@@ -128,18 +169,22 @@ function addRow() {
   localStorage.setItem("classValue", classValue);
   document.getElementById("name").value="";
   subjects.forEach(s=>document.getElementById(`subject-${s.name}`).value="");
-  updateClassDisplay();
-  renderTable();
-      
+  
+  location.reload();
+  
+  
 }
 
   
 // Update class name
 function updateClassDisplay(){
+document.getElementById("class").addEventListener("input", () => {
   const c=document.getElementById("class").value.trim();
   document.getElementById("classDisplay").innerText= c ? `Class: ${c}` : "";
+  localStorage.setItem("classValue", c);
   document.getElementById("classHeader").innerText= c ? `Class: ${c}` : "Class: Unknown";
-}
+  
+});}
 
 // Table render
 function renderTable() {
@@ -192,19 +237,12 @@ trTitle.innerHTML = `<th colspan="${2 + subjects.length + 2}"
 thead.appendChild(trTitle);
 
 // Add second header row: Class and assessment title (if you want)
+const savedAssessment = localStorage.getItem('lastUsedAssessment') || "";
 const trHeaderText = document.createElement("tr");
-trHeaderText.innerHTML = `<th colspan="${2 + subjects.length + 2}" 
-  style="
-    font-weight:bold; 
-    font-size:17px; 
-    text-align:center; 
-    background:#fff; 
-    border:none;
-    padding-top: 3px;
-    padding-bottom: 8px;
-  ">
-  Formative Assessment 1
-</th><br>`;
+trHeaderText.innerHTML = `<th id="examType" colspan="${2 + subjects.length + 2}" 
+  style="font-weight:bold; font-size:17px; text-align:center; background:#fff; border:none; padding-top: 3px; padding-bottom: 8px;">
+  ${savedAssessment}
+</th>`;
 thead.appendChild(trHeaderText);
     
     
@@ -316,6 +354,7 @@ const storage = firebase.storage();
 
 // PDF generate & upload
 function generateAndUploadPdf(){
+  
   const classValue = document.getElementById("class").value.trim() || "Unknown";
 
   
@@ -353,6 +392,24 @@ function generateAndUploadPdf(){
     alert("Failed to generate or upload PDF.");
   });
 }
+  
+  
+  window.addEventListener('DOMContentLoaded', () => {
+  const input = document.getElementById('assessmentInput');
+
+  const savedValue = localStorage.getItem('lastUsedAssessment');
+  if (savedValue) {
+    input.value = savedValue;
+  }
+
+  // On input change: save & re-render table
+  input.addEventListener('input', () => {
+    const newValue = input.value.trim();
+    localStorage.setItem('lastUsedAssessment', newValue);
+    renderTable();  // table will fetch new value and rebuild
+  });
+});
 </script>
+  
 </body>
-    </html>
+</html>
