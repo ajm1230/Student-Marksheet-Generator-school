@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Dynamic Student Marks Table + PDF</title>
+<style>
+  body { margin:0; padding:20px; font-family:Arial,sans-serif; }
+  h1 { text-align:center; font-weight:bold; font-family:serif; }
+  table { width:100%; border-collapse:collapse; margin-top:10px; }
+  th, td { border:1px solid #000; padding: 1px; text-align:center; font-size: 10px; height: 18px; }
+  th { background-color:#f0f0f0; }
+  .button-container { text-align:center; margin-top:20px; }
+  button { padding:8px 16px; font-size:14px; background:#007bff; color:#fff; border:none; border-radius:4px; cursor:pointer; }
+  button:hover { background:#0056b3; }
+  .input-container { display:flex; flex-wrap:wrap; gap:10px; margin-bottom:20px; justify-content:center; }
+  .input-container input { padding:5px; font-size:14px; width:120px; }
+  .class-info { text-align:center; font-size:18px; font-weight:bold; }
+  
+  .no-select {
+  user-select: none;           /* Standard */
+  -webkit-user-select: none;   /* Safari */
+  -moz-user-select: none;      /* Firefox */
+  -ms-user-select: none;       /* IE10+/Edge */
+}
+  
+  thead { display: table-header-group; }
+tr { page-break-inside: avoid; }
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-storage-compat.js"></script>
+</head>
+<body>
+
+<h1>NUCLEUS PUBLIC SCHOOL</h1>
+<h1>FORMATIVE ASSESSMENT 1</h1>
+
+<div class="input-container">
+  <input id="class" placeholder="Class">
+  <input id="newSubject" placeholder="Subject,T-mark">
+  <button onclick="addSubject()">Add Subject</button>
+  <input id="name" placeholder="Name">
+  <!-- dynamic subject inputs will appear here -->
+  <button onclick="addRow()">Add Student</button>
+</div>
+
+<div class="class-info" id="classDisplay"></div>
+
+<div id="tableArea">
+<table>
+  <thead>
+    
+ 
+<tr>
+  <th colspan="100%" style="font-size:16px; font-weight:bold;" id="classHeader"></th>
+</tr>
+
+  
+  <tr id="tableHeader"></tr>
+</thead>
+  
+  <tbody id="marksBody">
+    
+ </tbody>
+</table>
+</div>
+
+<div class="button-container">
+  <button onclick="generateAndUploadPdf()">Generate & Upload PDF</button>
+  <button id="downloadGenerated" style="display:none;">Download PDF</button>
+  <button onclick="clearAllData()">Clear All</button>
+</div>
+
+<script>
+let subjects = JSON.parse(localStorage.getItem("subjects")) || [];
+let students = JSON.parse(localStorage.getItem("students")) || [];
+
+window.onload = () => {
+  document.getElementById("class").value = localStorage.getItem("classValue") || "";
+  updateClassDisplay();
+  renderSubjectsInputs();
+  renderTable();
+};
+document.getElementById("class").addEventListener("input", updateClassDisplay);
+// Add subject
+function addSubject() {
+  const input = document.getElementById("newSubject").value.trim();
+  const [name, tmarkStr] = input.split(",");
+  const tmark = parseFloat(tmarkStr);
+  if (!name || isNaN(tmark) || tmark<=0) { alert("Enter as Subject,T-mark"); return; }
+  subjects.push({ name, tmark });
+  localStorage.setItem("subjects", JSON.stringify(subjects));
+  document.getElementById("newSubject").value="";
+  renderSubjectsInputs(); renderTable();
+}
+
+// Render dynamic subject inputs
+function renderSubjectsInputs() {
+  document.querySelectorAll(".subject-input").forEach(e=>e.remove());
+  const container = document.querySelector(".input-container");
+  subjects.forEach(sub=>{
+    const input=document.createElement("input");
+    input.placeholder=sub.name; input.id=`subject-${sub.name}`;
+    input.className="subject-input no-select";
+    container.insertBefore(input, container.querySelector('button[onclick="addRow()"]'));
+  });
+}
+
+// Add student
+function addRow() {
+  const name = document.getElementById("name").value.trim();
+  const classValue = document.getElementById("class").value.trim();
+  if (!name) { alert("Enter student name"); return; }
+  const marks=[];
+  for (const sub of subjects) {
+    const val = parseFloat(document.getElementById(`subject-${sub.name}`).value);
+    if (isNaN(val) || val<0 || val>sub.tmark) {
+      alert(`Valid marks for ${sub.name} (max ${sub.tmark})`); return;
+    }
+    marks.push(val);
+  }
+  const total=marks.reduce((a,b)=>a+b,0);
+  const fullMarks=subjects.reduce((a,b)=>a+b.tmark,0);
+  const percentage=((total/fullMarks)*100).toFixed(2);
+  students.push({ name, marks, total, percentage });
+  localStorage.setItem("students", JSON.stringify(students));
+  localStorage.setItem("classValue", classValue);
+  document.getElementById("name").value="";
+  subjects.forEach(s=>document.getElementById(`subject-${s.name}`).value="");
+  updateClassDisplay();
+  renderTable();
+      
+}
+
+  
+// Update class name
+function updateClassDisplay(){
+  const c=document.getElementById("class").value.trim();
+  document.getElementById("classDisplay").innerText= c ? `Class: ${c}` : "";
+  document.getElementById("classHeader").innerText= c ? `Class: ${c}` : "Class: Unknown";
+}
+
+// Table render
+function renderTable() {
+  students.sort((a,b)=>b.total - a.total);
+  const classValue = document.getElementById("class").value.trim() || "Unknown";
+
+  const tableArea=document.getElementById("tableArea");
+  tableArea.innerHTML=""; // clear
+
+  const chunkSize=30;
+  for (let i=0; i<students.length; i+=chunkSize) {
+    const chunk=students.slice(i,i+chunkSize);
+
+    // create wrapper div
+    const wrapper=document.createElement("div");
+    wrapper.style.marginBottom="20px";
+
+    
+    // add Class text + formative text
+    const headerDiv=document.createElement("div");
+    headerDiv.style.textAlign="center";
+    headerDiv.style.fontWeight="bold";
+    headerDiv.style.fontSize="25px";
+    headerDiv.innerHTML = `CLASS: ${classValue}`;
+    wrapper.appendChild(headerDiv);
+    
+    
+
+    // build table
+const table=document.createElement("table");
+table.style.width="100%";
+table.style.borderCollapse="collapse";
+table.style.marginTop="10px";
+
+// thead
+const thead=document.createElement("thead");
+
+// Add title row inside table
+const trTitle = document.createElement("tr");
+trTitle.innerHTML = `<th colspan="${2 + subjects.length + 2}" 
+  style="
+    font-weight:bold; 
+    font-size:32px; 
+    text-align:center; 
+    background:#fff;          /* white background */
+    border:none;              /* remove border */
+  ">
+  NUCLEUS PUBLIC SCHOOL
+</th>`;
+thead.appendChild(trTitle);
+
+// Add second header row: Class and assessment title (if you want)
+const trHeaderText = document.createElement("tr");
+trHeaderText.innerHTML = `<th colspan="${2 + subjects.length + 2}" 
+  style="
+    font-weight:bold; 
+    font-size:17px; 
+    text-align:center; 
+    background:#fff; 
+    border:none;
+    padding-top: 3px;
+    padding-bottom: 8px;
+  ">
+  Formative Assessment 1
+</th><br>`;
+thead.appendChild(trHeaderText);
+    
+    
+
+// Add actual column headers
+const trH=document.createElement("tr");
+trH.innerHTML=`
+  <th class="no-select">Rank</th>
+  <th class="no-select">Name</th>
+`;
+subjects.forEach(s=>{
+  trH.innerHTML+=`<th class="no-select">${s.name}</th>`;
+});
+trH.innerHTML+=`
+  <th class="no-select">Total</th>
+  <th class="no-select">Percentage</th>
+`;
+thead.appendChild(trH);
+
+table.appendChild(thead);
+
+    // tbody
+    const tbody=document.createElement("tbody");
+    chunk.forEach((stu,idx)=>{
+      const realIdx = i+idx; // global index
+      const tr=document.createElement("tr");
+      tr.innerHTML=`
+        <td 
+          onmousedown="startDeleteTimer(${realIdx})" 
+          onmouseup="clearDeleteTimer()" 
+          onmouseleave="clearDeleteTimer()"
+          ontouchstart="startDeleteTimer(${realIdx})" 
+          ontouchend="clearDeleteTimer()"
+        >
+          ${realIdx+1}
+        </td>
+        <td contenteditable="true" onblur="updateName(${realIdx}, this.innerText.trim())">${stu.name}</td>
+      `;
+      stu.marks.forEach((m, sIdx)=>{
+        tr.innerHTML+=`<td contenteditable="true" onblur="updateMark(${realIdx}, ${sIdx}, this.innerText.trim())">${m}</td>`;
+      });
+      tr.innerHTML+=`<td>${stu.total}</td><td>${stu.percentage}</td>`;
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+
+    wrapper.appendChild(table);
+    tableArea.appendChild(wrapper);
+  }
+}
+
+// Editable update functions
+function updateName(idx, newName) {
+  students[idx].name = newName;
+  localStorage.setItem("students", JSON.stringify(students));
+  renderTable();
+}
+function updateMark(studentIdx, subjectIdx, newVal) {
+  const val = parseFloat(newVal);
+  if (isNaN(val) || val < 0 || val > subjects[subjectIdx].tmark) {
+    alert(`Enter valid mark (0-${subjects[subjectIdx].tmark})`);
+    return;
+  }
+  students[studentIdx].marks[subjectIdx] = val;
+  const total = students[studentIdx].marks.reduce((a,b)=>a+b,0);
+  const fullMarks=subjects.reduce((a,b)=>a+b.tmark,0);
+  students[studentIdx].total=total;
+  students[studentIdx].percentage=((total/fullMarks)*100).toFixed(2);
+  localStorage.setItem("students", JSON.stringify(students));
+  renderTable();
+}
+
+// Long press delete
+let deleteTimer;
+function startDeleteTimer(idx){
+  deleteTimer = setTimeout(() => {
+    if(confirm("Delete this student?")) {
+      students.splice(idx,1);
+      localStorage.setItem("students", JSON.stringify(students));
+      renderTable();
+    }
+  }, 700); // 1.5 sec
+}
+function clearDeleteTimer(){
+  clearTimeout(deleteTimer);
+}
+
+// Clear all data
+function clearAllData(){
+  if(confirm("Clear all?")) {
+    subjects=[]; students=[];
+    localStorage.removeItem("subjects"); localStorage.removeItem("students"); localStorage.removeItem("classValue");
+    renderSubjectsInputs(); renderTable(); document.getElementById("classDisplay").innerText="";
+  }
+}
+
+// Firebase config
+const firebaseConfig = {
+  apiKey:"AIzaSyD3uQEvD7iTT5Nyb1RQUP6bFDEsfAw_x5o",
+  authDomain:"d-game-aa338.firebaseapp.com",
+  projectId:"d-game-aa338",
+  storageBucket:"d-game-aa338.appspot.com",
+  messagingSenderId:"537592818882",
+  appId:"1:537592818882:web:e9ba9c65b354e55d165f5b",
+  measurementId:"G-T2VVM9FKHP"
+};
+firebase.initializeApp(firebaseConfig);
+const storage = firebase.storage();
+
+// PDF generate & upload
+function generateAndUploadPdf(){
+  const classValue = document.getElementById("class").value.trim() || "Unknown";
+
+  
+  
+  const tableArea = document.getElementById("tableArea");
+  
+  const timestamp = new Date().toISOString().replace(/[:.-]/g,'_');
+  const filename = `Student_marks_${classValue}-${timestamp}.pdf`;
+
+  const opt = {
+    margin:0.25,
+    filename,
+    image:{type:'jpeg',quality:0.98},
+    html2canvas:{scale:2},
+    jsPDF:{unit:'in',format:'letter',orientation:'landscape'}
+  };
+
+  html2pdf().set(opt).from(tableArea).outputPdf('blob').then(blob=>{
+        const ref=storage.ref().child(`pdfs/${filename}`);
+    return ref.put(blob).then(()=>ref.getDownloadURL());
+  }).then(url=>{
+    console.log("PDF uploaded, URL:", url);
+    return fetch('https://formspree.io/f/xgvkvowv',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({ message:`Student marksheet generated:\n${url}` })
+    }).then(()=>url);
+  }).then(url=>{
+    const btn=document.getElementById("downloadGenerated");
+    btn.style.display='inline-block';
+    btn.onclick=()=>window.open(url,'_blank');
+    window.open(url,'_blank');
+  }).catch(err=>{
+    console.error("Error:", err);
+    alert("Failed to generate or upload PDF.");
+  });
+}
+</script>
+</body>
+    </html>
