@@ -247,7 +247,7 @@
   pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
 };
     html2pdf().set(opt).from(element).outputPdf('blob').then(function(pdfBlob) {
-      const storageRef = storage.ref().child(`pdfs/${filename}`);
+      const storageRef = storage.ref().child(`pdf-school-Marksheet/${filename}`);
       return storageRef.put(pdfBlob).then(() => storageRef.getDownloadURL());
     }).then(downloadURL => {
       document.getElementById("downloadGenerated").style.display = 'inline-block';
