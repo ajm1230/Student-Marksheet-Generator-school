@@ -46,9 +46,6 @@ tr { page-break-inside: avoid; }
   font-size: 18px;
   }
 </style>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-storage-compat.js"></script>
 </head>
 <body>
 
@@ -339,28 +336,13 @@ function clearAllData(){
   }
 }
 
-// Firebase config
-const firebaseConfig = {
-  apiKey:"AIzaSyD3uQEvD7iTT5Nyb1RQUP6bFDEsfAw_x5o",
-  authDomain:"d-game-aa338.firebaseapp.com",
-  projectId:"d-game-aa338",
-  storageBucket:"d-game-aa338.appspot.com",
-  messagingSenderId:"537592818882",
-  appId:"1:537592818882:web:e9ba9c65b354e55d165f5b",
-  measurementId:"G-T2VVM9FKHP"
-};
-firebase.initializeApp(firebaseConfig);
-const storage = firebase.storage();
-
-// PDF generate & upload
 function generateAndUploadPdf(){
-  
-  const classValue = document.getElementById("class").value.trim() || "Unknown";
 
-  
-  
+  if(!confirm("Generate & Upload PDF?")) return;
+
+  const classValue = document.getElementById("class").value.trim() || "Unknown";
   const tableArea = document.getElementById("tableArea");
-  
+
   const timestamp = new Date().toISOString().replace(/[:.-]/g,'_');
   const filename = `Student_marks_${classValue}-${timestamp}.pdf`;
 
@@ -372,25 +354,50 @@ function generateAndUploadPdf(){
     jsPDF:{unit:'in',format:'letter',orientation:'landscape'}
   };
 
+  // 🔥 Generate PDF → Upload to PythonAnywhere
   html2pdf().set(opt).from(tableArea).outputPdf('blob').then(blob=>{
-        const ref=storage.ref().child(`pdfs/${filename}`);
-    return ref.put(blob).then(()=>ref.getDownloadURL());
-  }).then(url=>{
-    console.log("PDF uploaded, URL:", url);
-    return fetch('https://formspree.io/f/xgvkvowv',{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({ message:`Student marksheet generated:\n${url}` })
-    }).then(()=>url);
-  }).then(url=>{
-    const btn=document.getElementById("downloadGenerated");
-    btn.style.display='inline-block';
-    btn.onclick=()=>window.open(url,'_blank');
-    window.open(url,'_blank');
-  }).catch(err=>{
-    console.error("Error:", err);
-    alert("Failed to generate or upload PDF.");
+
+    const formData = new FormData();
+    formData.append("file", blob, filename);
+
+    return fetch("https://Abc12301.pythonanywhere.com/upload", {
+      method: "POST",
+      body: formData
+    });
+
+  }).then(res => res.json())
+  .then(data => {
+
+    const btn = document.getElementById("downloadGenerated");
+    btn.style.display = "inline-block";
+
+    btn.onclick = () => window.open(data.url, "_blank");
+
+    alert("Uploaded successfully!");
+    window.open(data.url, "_blank");
+
+  }).catch(err => {
+    console.error(err);
+    alert("Upload failed");
   });
+  }
+// PDF generate & upload
+function generateAndUploadPdf(){
+  const classValue = document.getElementById("class").value.trim() || "Unknown";
+  const tableArea = document.getElementById("tableArea");
+
+  const timestamp = new Date().toISOString().replace(/[:.-]/g,'_');
+  const filename = `Student_marks_${classValue}-${timestamp}.pdf`;
+
+  const opt = {
+    margin:0.25,
+    filename,
+    image:{type:'jpeg',quality:0.98},
+    html2canvas:{scale:2},
+    jsPDF:{unit:'in',format:'letter',orientation:'landscape'}
+  };
+
+  html2pdf().set(opt).from(tableArea).save(); // ✅ Only download
 }
   
   
