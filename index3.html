@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Dynamic Student Marks Table + PDF</title>
+  <style>
+    body { margin:0; padding:20px; font-family:Arial,sans-serif; }
+    h1 { text-align:center; font-weight:bold; font-family:serif; }
+    table { width:100%; border-collapse:collapse; margin-top:10px; }
+    th, td { border:1px solid #000; padding:1px; text-align:center; font-size:10px; height:18px; }
+    th { background-color:#f0f0f0; }
+    .button-container { text-align:center; margin-top:20px; }
+    button { padding:8px 16px; font-size:14px; background:#007bff; color:#fff; border:none; border-radius:4px; cursor:pointer; }
+    button:hover { background:#0056b3; }
+    .input-container, .input-container2 { display:flex; flex-wrap:wrap; gap:10px; margin-bottom:20px; justify-content:center; }
+    .input-container input { padding:5px; font-size:14px; width:120px; }
+    .class-info { text-align:center; font-size:18px; font-weight:bold; }
+    .no-select { user-select:none; -webkit-user-select:none; -moz-user-select:none; -ms-user-select:none; }
+    thead { display:table-header-group; }
+    tr { page-break-inside:avoid; }
+    .subject-input, .exam-type, #name, #class, #newSubject {
+      padding:6px 10px;
+      border:1px solid #ccc;
+      border-radius:4px;
+      font-size:18px;
+    }
+    #assessmentInput {
+      padding:6px 10px;
+      border:none;
+      border-radius:4px;
+      font-size:14px;
+      width:250px;
+    }
+    #statusMsg {
+      text-align:center;
+      margin-top:10px;
+      font-size:14px;
+      color:#333;
+      font-weight:bold;
+    }
+  </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+</head>
+<body>
+
+  <h1>Marksheet Generator</h1>
+
+  <button onclick="saveChanges()" style="padding:3px; text-align:center; position:fixed; top:3%; left:50%; transform:translate(-50%,-50%); cursor:pointer;">
+    Save Changes
+  </button>
+
+  <div class="exam-type">
+    <input list="assessmentList" id="assessmentInput" placeholder="Type or select assessment">
+    <datalist id="assessmentList">
+      <option value="FORMATIVE ASSESSMENT">
+      <option value="SUMMATIVE ASSESSMENT">
+    </datalist>
+  </div>
+  <hr>
+
+  <div class="input-container">
+    <input id="class" placeholder="Class">
+    <input id="newSubject" placeholder="Subject,T-mark">
+    <button onclick="addSubject()">Add Subject</button>
+  </div>
+  <hr>
+
+  <div class="input-container2">
+    <input id="name" placeholder="Name">
+    <button onclick="addRow()">Add Student</button>
+  </div>
+
+  <div class="class-info" id="classDisplay"></div>
+  <div id="tableArea"></div>
+  <div id="statusMsg"></div>
+
+  <div class="button-container">
+    <button onclick="generateAndUploadPdf()">Generate &amp; Upload PDF</button>
+    <button id="downloadGenerated" style="display:none;">Download PDF</button>
+    <button onclick="clearAllData()">Clear All</button>
+  </div>
+
+<script>
+  var PYTHONANYWHERE_URL = "https://Abc12301.pythonanywhere.com/upload-pdf";
+  var UPLOAD_SECRET = "nps_marksheet_X7k2mP9qR4";
+
+  var subjects = JSON.parse(localStorage.getItem("subjects") || "[]");
+  var students = JSON.parse(localStorage.getItem("students") || "[]");
+
+  window.onload = function() {
+    var classInput = document.getElementById("class");
+    var assessmentInput = document.getElementById("assessmentInput");
+
+    classInput.value = localStorage.getItem("classValue") || "";
+    assessmentInput.value = localStorage.getItem("lastUsedAssessment") || "";
+
+    updateClassDisplay();
+
+    classInput.addEventListener("input", function() {
+      localStorage.setItem("classValue", classInput.value.trim());
+      updateClassDisplay();
+      renderTable();
+    });
+
+    assessmentInput.addEventListener("input", function() {
+      localStorage.setItem("lastUsedAssessment", assessmentInput.value.trim());
+      renderTable();
+    });
+
+    renderSubjectsInputs();
+    renderTable();
+  };
+
+  function updateClassDisplay() {
+    var c = document.getElementById("class").value.trim();
+    document.getElementById("classDisplay").innerText = c ? "Class: " + c : "";
+  }
+
+  function saveChanges() {
+    localStorage.setItem("classValue", document.getElementById("class").value.trim());
+    localStorage.setItem("lastUsedAssessment", document.getElementById("assessmentInput").value.trim());
+    updateClassDisplay();
+    renderTable();
+    alert("Changes saved!");
+  }
+
+  function addSubject() {
+    var input = document.getElementById("newSubject").value.trim();
+    var parts = input.split(",");
+    var name = parts[0];
+    var tmark = parseFloat(parts[1]);
+    if (!name || isNaN(tmark) || tmark <= 0) { alert("Enter as Subject,T-mark"); return; }
+    subjects.push({ name: name, tmark: tmark });
+    localStorage.setItem("subjects", JSON.stringify(subjects));
+    document.getElementById("newSubject").value = "";
+    renderSubjectsInputs();
+    renderTable();
+  }
+
+  function renderSubjectsInputs() {
+    document.querySelectorAll(".subject-input").forEach(function(e) { e.remove(); });
+    var container = document.querySelector(".input-container2");
+    var addBtn = container.querySelector('button[onclick="addRow()"]');
+    subjects.forEach(function(sub) {
+      var input = document.createElement("input");
+      input.placeholder = sub.name;
+      input.id = "subject-" + sub.name;
+      input.className = "subject-input no-select";
+      container.insertBefore(input, addBtn);
+    });
+  }
+
+  function addRow() {
+    var name = document.getElementById("name").value.trim();
+    var classValue = document.getElementById("class").value.trim();
+    if (!name) { alert("Enter student name"); return; }
+
+    var marks = [];
+    for (var i = 0; i < subjects.length; i++) {
+      var sub = subjects[i];
+      var el = document.getElementById("subject-" + sub.name);
+      var val = parseFloat(el.value);
+      if (isNaN(val) || val < 0 || val > sub.tmark) {
+        alert("Valid marks for " + sub.name + " (max " + sub.tmark + ")");
+        return;
+      }
+      marks.push(val);
+    }
+
+    var total = marks.reduce(function(a, b) { return a + b; }, 0);
+    var fullMarks = subjects.reduce(function(a, b) { return a + b.tmark; }, 0);
+    var percentage = ((total / fullMarks) * 100).toFixed(2);
+
+    students.push({ name: name, marks: marks, total: total, percentage: percentage });
+    localStorage.setItem("students", JSON.stringify(students));
+    localStorage.setItem("classValue", classValue);
+
+    document.getElementById("name").value = "";
+    subjects.forEach(function(s) {
+      document.getElementById("subject-" + s.name).value = "";
+    });
+
+    renderTable();
+  }
+
+  function renderTable() {
+    students.sort(function(a, b) { return b.total - a.total; });
+
+    var classValue = document.getElementById("class").value.trim() || "Unknown";
+    var savedAssessment = localStorage.getItem("lastUsedAssessment") || "";
+    var tableArea = document.getElementById("tableArea");
+    tableArea.innerHTML = "";
+
+    var chunkSize = 30;
+    for (var i = 0; i < students.length; i += chunkSize) {
+      var chunk = students.slice(i, i + chunkSize);
+      var wrapper = document.createElement("div");
+      wrapper.style.marginBottom = "20px";
+
+      var table = document.createElement("table");
+      table.style.width = "100%";
+      table.style.borderCollapse = "collapse";
+      table.style.marginTop = "10px";
+
+      var thead = document.createElement("thead");
+      var colSpan = 2 + subjects.length + 2;
+
+      var trTitle = document.createElement("tr");
+      trTitle.innerHTML = '<th colspan="' + colSpan + '" style="font-weight:bold; font-size:32px; text-align:center; background:#fff; border:none;">NUCLEUS PUBLIC SCHOOL</th>';
+      thead.appendChild(trTitle);
+
+      var headerText = savedAssessment;
+      if (savedAssessment && classValue) headerText += " — ";
+      headerText += "CLASS: " + classValue;
+      var trHeaderText = document.createElement("tr");
+      trHeaderText.innerHTML = '<th colspan="' + colSpan + '" style="font-weight:bold; font-size:17px; text-align:center; background:#fff; border:none; padding-top:3px; padding-bottom:8px;">' + headerText + '</th>';
+      thead.appendChild(trHeaderText);
+
+      var trH = document.createElement("tr");
+      trH.innerHTML = '<th class="no-select">Rank</th><th class="no-select">Name</th>';
+      subjects.forEach(function(s) {
+        trH.innerHTML += '<th class="no-select">' + s.name + '</th>';
+      });
+      trH.innerHTML += '<th class="no-select">Total</th><th class="no-select">Percentage</th>';
+      thead.appendChild(trH);
+      table.appendChild(thead);
+
+      var tbody = document.createElement("tbody");
+      chunk.forEach(function(stu, idx) {
+        var realIdx = i + idx;
+        var tr = document.createElement("tr");
+        tr.innerHTML =
+          '<td onmousedown="startDeleteTimer(' + realIdx + ')" onmouseup="clearDeleteTimer()" onmouseleave="clearDeleteTimer()" ontouchstart="startDeleteTimer(' + realIdx + ')" ontouchend="clearDeleteTimer()">' + (realIdx + 1) + '</td>' +
+          '<td contenteditable="true" onblur="updateName(' + realIdx + ', this.innerText.trim())">' + stu.name + '</td>';
+        stu.marks.forEach(function(m, sIdx) {
+          tr.innerHTML += '<td contenteditable="true" onblur="updateMark(' + realIdx + ', ' + sIdx + ', this.innerText.trim())">' + m + '</td>';
+        });
+        tr.innerHTML += '<td>' + stu.total + '</td><td>' + stu.percentage + '</td>';
+        tbody.appendChild(tr);
+      });
+      table.appendChild(tbody);
+      wrapper.appendChild(table);
+      tableArea.appendChild(wrapper);
+    }
+  }
+
+  function updateName(idx, newName) {
+    students[idx].name = newName;
+    localStorage.setItem("students", JSON.stringify(students));
+    renderTable();
+  }
+
+  function updateMark(studentIdx, subjectIdx, newVal) {
+    var val = parseFloat(newVal);
+    if (isNaN(val) || val < 0 || val > subjects[subjectIdx].tmark) {
+      alert("Enter valid mark (0-" + subjects[subjectIdx].tmark + ")");
+      return;
+    }
+    students[studentIdx].marks[subjectIdx] = val;
+    var total = students[studentIdx].marks.reduce(function(a, b) { return a + b; }, 0);
+    var fullMarks = subjects.reduce(function(a, b) { return a + b.tmark; }, 0);
+    students[studentIdx].total = total;
+    students[studentIdx].percentage = ((total / fullMarks) * 100).toFixed(2);
+    localStorage.setItem("students", JSON.stringify(students));
+    renderTable();
+  }
+
+  var deleteTimer;
+  function startDeleteTimer(idx) {
+    deleteTimer = setTimeout(function() {
+      if (confirm("Delete this student?")) {
+        students.splice(idx, 1);
+        localStorage.setItem("students", JSON.stringify(students));
+        renderTable();
+      }
+    }, 700);
+  }
+  function clearDeleteTimer() { clearTimeout(deleteTimer); }
+
+  function clearAllData() {
+    if (confirm("Clear all?")) {
+      subjects = []; students = [];
+      localStorage.removeItem("subjects");
+      localStorage.removeItem("students");
+      localStorage.removeItem("classValue");
+      localStorage.removeItem("lastUsedAssessment");
+      document.getElementById("class").value = "";
+      document.getElementById("assessmentInput").value = "";
+      document.getElementById("classDisplay").innerText = "";
+      document.getElementById("statusMsg").innerText = "";
+      renderSubjectsInputs();
+      renderTable();
+    }
+  }
+
+  function setStatus(msg) {
+    document.getElementById("statusMsg").innerText = msg;
+  }
+
+  function generateAndUploadPdf() {
+    var classValue = document.getElementById("class").value.trim() || "Unknown";
+    var tableArea = document.getElementById("tableArea");
+
+    if (tableArea.innerHTML.trim() === "") {
+      alert("No data to generate PDF. Please add students first.");
+      return;
+    }
+
+    var timestamp = new Date().toISOString().replace(/[:.-]/g, "_");
+    var filename = "Student_marks_" + classValue + "-" + timestamp + ".pdf";
+
+    var opt = {
+      margin: 0.25,
+      filename: filename,
+      image: { type: "jpeg", quality: 0.98 },
+      html2canvas: { scale: 2, useCORS: true, logging: false },
+      jsPDF: { unit: "in", format: "letter", orientation: "landscape" }
+    };
+
+    setStatus("Generating PDF...");
+
+    html2pdf().set(opt).from(tableArea).outputPdf("blob").then(function(blob) {
+      setStatus("Uploading to server...");
+      var formData = new FormData();
+      formData.append("file", blob, filename);
+      return fetch(PYTHONANYWHERE_URL, {
+        method: "POST",
+        headers: { "X-Upload-Token": UPLOAD_SECRET },
+        body: formData
+      });
+    }).then(function(uploadRes) {
+      if (!uploadRes.ok) {
+        return uploadRes.json().then(function(e) { throw new Error(e.error || "Upload failed"); });
+      }
+      return uploadRes.json();
+    }).then(function(data) {
+      var url = data.url;
+      var btn = document.getElementById("downloadGenerated");
+      btn.style.display = "inline-block";
+      btn.onclick = function() { window.open(url, "_blank"); };
+      window.open(url, "_blank");
+      setStatus("Done! PDF uploaded successfully.");
+    }).catch(function(err) {
+      console.error("PDF Error:", err);
+      setStatus("Failed: " + err.message);
+      alert("Failed to generate or upload PDF.\nError: " + err.message);
+    });
+  }
+</script>
+</body>
+</html>
