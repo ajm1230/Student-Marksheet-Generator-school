@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Marksheet Generator</title>
+
+<!-- PDF -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+<style>
+body { margin:0; padding:20px; font-family:Arial; }
+h1 { text-align:center; font-family:serif; }
+
+table { width:100%; border-collapse:collapse; margin-top:10px; }
+th,td { border:1px solid #000; font-size:10px; text-align:center; height:18px; }
+th { background:#f0f0f0; }
+
+.input-container,.input-container2 { display:flex; flex-wrap:wrap; gap:10px; justify-content:center; }
+input { padding:6px; font-size:14px; }
+
+button { padding:8px 16px; cursor:pointer; background:#007bff; color:#fff; border:none; border-radius:4px; }
+button:hover { background:#0056b3; }
+
+.no-select { user-select:none; }
+</style>
+</head>
+
+<body>
+
+<h1>Marksheet Generator</h1>
+
+<div class="input-container">
+  <input id="class" placeholder="Class">
+  <input id="newSubject" placeholder="Subject,T-mark">
+  <button onclick="addSubject()">Add Subject</button>
+</div>
+
+<div class="input-container2">
+  <input id="name" placeholder="Name">
+  <button onclick="addRow()">Add Student</button>
+</div>
+
+<div style="text-align:center;margin-top:10px;">
+  <input list="assessmentList" id="assessmentInput" placeholder="Assessment">
+  <datalist id="assessmentList">
+    <option value="FORMATIVE ASSESSMENT">
+    <option value="SUMMATIVE ASSESSMENT">
+  </datalist>
+</div>
+
+<div id="classDisplay" style="text-align:center;font-weight:bold;"></div>
+
+<div id="tableArea"></div>
+
+<br>
+<center>
+<button onclick="generateAndUploadPdf()">Generate & Upload PDF</button>
+<button id="downloadGenerated" style="display:none;">Download PDF</button>
+<button onclick="clearAllData()">Clear All</button>
+</center>
+
+<script>
+
+// DATA
+let subjects = JSON.parse(localStorage.getItem("subjects")) || [];
+let students = JSON.parse(localStorage.getItem("students")) || [];
+
+// INIT
+window.onload = () => {
+  document.getElementById("class").value = localStorage.getItem("classValue") || "";
+  document.getElementById("assessmentInput").value = localStorage.getItem("assessment") || "";
+  updateClassDisplay();
+  renderSubjectsInputs();
+  renderTable();
+};
+
+document.getElementById("class").addEventListener("input", updateClassDisplay);
+document.getElementById("assessmentInput").addEventListener("input", e=>{
+  localStorage.setItem("assessment", e.target.value);
+  renderTable();
+});
+
+// CLASS DISPLAY FIX
+function updateClassDisplay(){
+  const c=document.getElementById("class").value.trim();
+  document.getElementById("classDisplay").innerText = c ? `Class: ${c}` : "";
+  localStorage.setItem("classValue", c);
+}
+
+// ADD SUBJECT
+function addSubject(){
+  const input=document.getElementById("newSubject").value.trim();
+  const [name,t]=input.split(",");
+  const tmark=parseFloat(t);
+
+  if(!name || isNaN(tmark)) return alert("Use Subject,T-mark");
+
+  if(subjects.some(s=>s.name.toLowerCase()==name.toLowerCase()))
+    return alert("Subject exists");
+
+  subjects.push({name,tmark});
+  localStorage.setItem("subjects",JSON.stringify(subjects));
+
+  document.getElementById("newSubject").value="";
+  renderSubjectsInputs(); renderTable();
+}
+
+// SUBJECT INPUTS
+function renderSubjectsInputs(){
+  document.querySelectorAll(".subject-input").forEach(e=>e.remove());
+  const container=document.querySelector(".input-container2");
+
+  subjects.forEach(sub=>{
+    const i=document.createElement("input");
+    i.placeholder=sub.name;
+    i.id=`subject-${sub.name}`;
+    i.className="subject-input";
+    container.insertBefore(i, container.querySelector("button"));
+  });
+}
+
+// ADD STUDENT
+function addRow(){
+  const name=document.getElementById("name").value.trim();
+  if(!name) return alert("Enter name");
+
+  const marks=[];
+  for(const sub of subjects){
+    const val=parseFloat(document.getElementById(`subject-${sub.name}`).value);
+    if(isNaN(val) || val>sub.tmark) return alert(`Invalid marks ${sub.name}`);
+    marks.push(val);
+  }
+
+  const total=marks.reduce((a,b)=>a+b,0);
+  const full=subjects.reduce((a,b)=>a+b.tmark,0);
+  const percentage=((total/full)*100).toFixed(2);
+
+  students.push({name,marks,total,percentage});
+  localStorage.setItem("students",JSON.stringify(students));
+
+  document.getElementById("name").value="";
+  renderTable();
+}
+
+// TABLE
+function renderTable(){
+
+  const sorted=[...students].sort((a,b)=>b.total-a.total);
+  const tableArea=document.getElementById("tableArea");
+  tableArea.innerHTML="";
+
+  const chunkSize=30;
+
+  for(let i=0;i<sorted.length;i+=chunkSize){
+
+    const chunk=sorted.slice(i,i+chunkSize);
+
+    const table=document.createElement("table");
+
+    // HEADER
+    let html=`
+    <tr><th colspan="${2+subjects.length+2}" style="font-size:20px;background:#fff;border:none;">
+    NUCLEUS PUBLIC SCHOOL
+    </th></tr>
+
+    <tr><th colspan="${2+subjects.length+2}" style="background:#fff;border:none;">
+    ${localStorage.getItem("assessment")||""}
+    </th></tr>
+
+    <tr>
+      <th>Rank</th><th>Name</th>
+    `;
+
+    subjects.forEach(s=>html+=`<th>${s.name}</th>`);
+    html+=`<th>Total</th><th>%</th></tr>`;
+
+    // ROWS
+    chunk.forEach((stu,idx)=>{
+      const real=i+idx;
+
+      html+=`<tr>
+      <td onmousedown="startDeleteTimer(${real})" onmouseup="clearDeleteTimer()">${real+1}</td>
+      <td contenteditable onblur="updateName(${real},this.innerText)">${stu.name}</td>`;
+
+      stu.marks.forEach((m,sIdx)=>{
+        html+=`<td contenteditable onblur="updateMark(${real},${sIdx},this.innerText)">${m}</td>`;
+      });
+
+      html+=`<td>${stu.total}</td><td>${stu.percentage}</td></tr>`;
+    });
+
+    table.innerHTML=html;
+    tableArea.appendChild(table);
+  }
+}
+
+// EDIT
+function updateName(i,n){
+  students[i].name=n;
+  localStorage.setItem("students",JSON.stringify(students));
+}
+
+function updateMark(i,j,val){
+  const v=parseFloat(val);
+  if(isNaN(v)) return;
+
+  students[i].marks[j]=v;
+  const t=students[i].marks.reduce((a,b)=>a+b,0);
+  const full=subjects.reduce((a,b)=>a+b.tmark,0);
+
+  students[i].total=t;
+  students[i].percentage=((t/full)*100).toFixed(2);
+
+  localStorage.setItem("students",JSON.stringify(students));
+  renderTable();
+}
+
+// DELETE
+let timer;
+function startDeleteTimer(i){
+  timer=setTimeout(()=>{
+    if(confirm("Delete?")){
+      students.splice(i,1);
+      localStorage.setItem("students",JSON.stringify(students));
+      renderTable();
+    }
+  },700);
+}
+function clearDeleteTimer(){ clearTimeout(timer); }
+
+// CLEAR
+function clearAllData(){
+  if(confirm("Clear all?")){
+    localStorage.clear();
+    subjects=[]; students=[];
+    renderSubjectsInputs(); renderTable();
+  }
+}
+
+// 🚀 PDF + UPLOAD
+function generateAndUploadPdf(){
+
+  const filename=`marks_${Date.now()}.pdf`;
+
+  html2pdf().from(document.getElementById("tableArea")).outputPdf("blob").then(blob=>{
+
+    const fd=new FormData();
+    fd.append("file",blob,filename);
+
+    return fetch("https://Abc12301.pythonanywhere.com/upload",{
+      method:"POST",
+      body:fd
+    });
+
+  }).then(res=>res.json())
+  .then(data=>{
+
+    const btn=document.getElementById("downloadGenerated");
+    btn.style.display="inline-block";
+    btn.onclick=()=>window.open(data.url);
+
+    window.open(data.url);
+
+  }).catch(()=>alert("Upload failed"));
+}
+
+</script>
+
+</body>
+  </html>
